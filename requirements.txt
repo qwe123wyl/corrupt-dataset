@@ -1,0 +1,21 @@
+# requirements.txt
+# ─────────────────────────────────────────────────────────────
+# 安装方法：pip install -r requirements.txt
+# ─────────────────────────────────────────────────────────────
+
+# 数据处理
+numpy>=1.24.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# 音频处理
+soundfile>=0.12.0
+pydub>=0.25.0
+
+# 视频/图像处理
+torch>=2.0.0
+torchvision>=0.15.0
+Pillow>=9.0.0
+opencv-python>=4.7.0
+scikit-image>=0.20.0
+scipy>=1.10.0

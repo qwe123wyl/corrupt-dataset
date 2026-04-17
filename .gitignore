@@ -1,0 +1,50 @@
+# corrupt-dataset .gitignore
+# ─────────────────────────────────────────────────────────────
+# 遵循 GitHub 惯例：大数据文件、输出文件、缓存文件不上传
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── 输出文件（由流水线生成，每次运行都会重新生成）─────────────
+_output/
+_sample_lists/       # step 0 从 refer.json 生成，可由 step 0 重新生成
+*.csv                 # 所有 .csv（sample_lists, noise_csv 等流水线产出）
+
+# data/ 目录下的元数据文件需要上传，先忽略再逐层取反
+data/
+!data/
+!data/refer/
+!data/class_labels/
+!data/refer/*.json
+!data/class_labels/*.csv
+
+# ── 数据集文件（大文件，从外部获取，不放 git）────────────────
+# 如果你在 corrupt-dataset/dataset/ 下也存了数据副本，同样排除：
+dataset/
+
+# ── 临时文件 ─────────────────────────────────────────────────
+/tmp/
+*.tmp
+*.swp
+*.swo
+
+# ── macOS ───────────────────────────────────────────────────
+.DS_Store
+
+# ── Jupyter ──────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── IDE ─────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+
+# ── 用户配置（不要提交你自己的 USER_CONFIG.py）────────────────
+# USER_CONFIG.py 由用户从 USER_CONFIG.example.py 复制，不要提交到 git
+USER_CONFIG.py
