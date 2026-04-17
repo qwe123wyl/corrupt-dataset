@@ -38,7 +38,7 @@ python run.py --dataset ks50 --from-step 0 --to-step 5 --severity 3 --workers 4
 
 ### 支持的数据集
 
-| `--dataset` | 说明 |
+| `dataset` | 说明 |
 |---|---|
 | `ks50` | Kinetics-Sound 50 测试集（50 类） |
 | `ks50_train` | Kinetics-Sound 50 训练集（50 类） |
@@ -46,7 +46,7 @@ python run.py --dataset ks50 --from-step 0 --to-step 5 --severity 3 --workers 4
 
 ### 严重程度
 
-`--severity 1~5`，数值越大污染越强。不同噪声类型在各级别有不同的参数（噪声强度、模糊半径、叠加音量等）。
+`severity 1~5`，数值越大污染越强。不同噪声类型在各级别有不同的参数（噪声强度、模糊半径、叠加音量等）。
 
 ### 完整流水线
 
