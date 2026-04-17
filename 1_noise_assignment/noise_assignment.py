@@ -22,13 +22,13 @@ from collections import defaultdict
 
 
 # ══════════════════════════════════════════════════════════════
-# CONFIG：根据实际情况修改这里
+# CONFIG：根据实际情况修改这里（仅作为默认值，命令行参数优先）
 # ══════════════════════════════════════════════════════════════
 
 XLSX_PATH   = "noise_compatibility_KS50_VGGSound.xlsx"  # 兼容性表路径
 SHEET_NAME  = "KS-50 (50 classes)"                      # 用哪个数据集的 sheet
-                                                         # KS-50  → "KS-50 (50 classes)"
-                                                         # VGGSound → "VGGSound (309 classes)"
+                                                             # KS-50  → "KS-50 (50 classes)"
+                                                             # VGGSound → "VGGSound (309 classes)"
 INPUT_CSV   = None          # 你的样本 CSV 路径，None 则使用下方 mock 数据
 OUTPUT_CSV  = "dataset_with_noise.csv"   # 输出结果路径
 SEED        = 42            # 随机种子，保证结果可复现
@@ -208,23 +208,38 @@ def print_balance_report(result_df: pd.DataFrame, compat_table: dict):
 # ══════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="为每个样本分配一种兼容的噪声（配额上限法）")
+    parser.add_argument("--xlsx-path",   type=str, default=None,
+                        help="兼容性表路径（Excel）")
+    parser.add_argument("--sheet-name",  type=str, default=None,
+                        help="Excel sheet 名称")
+    parser.add_argument("--input-csv",   type=str, default=None,
+                        help="样本 CSV 路径（需含 sample_id, class_name 列）")
+    parser.add_argument("--output-csv",  type=str, default=None,
+                        help="输出 CSV 路径")
+    parser.add_argument("--seed",        type=int, default=None,
+                        help="随机种子")
+    args = parser.parse_args()
+
+    # 命令行参数优先，否则用 CONFIG 中的默认值
+    xlsx_path   = args.xlsx_path  if args.xlsx_path  is not None else XLSX_PATH
+    sheet_name  = args.sheet_name if args.sheet_name  is not None else SHEET_NAME
+    input_csv   = args.input_csv  if args.input_csv   is not None else INPUT_CSV
+    output_csv  = args.output_csv if args.output_csv   is not None else OUTPUT_CSV
+    seed        = args.seed       if args.seed         is not None else SEED
 
     # ── 1. 读取兼容性表 ───────────────────────────────────────
-    print(f"[1/4] 读取兼容性表：{XLSX_PATH}  /  sheet: {SHEET_NAME}")
-    compat_table = load_compat_table(XLSX_PATH, SHEET_NAME)
+    print(f"[1/4] 读取兼容性表：{xlsx_path}  /  sheet: {sheet_name}")
+    compat_table = load_compat_table(xlsx_path, sheet_name)
     print(f"      共 {len(compat_table)} 个类别")
 
     # ── 2. 读取 / 构造样本表 ──────────────────────────────────
     print(f"[2/4] 加载样本数据")
-    if INPUT_CSV is not None:
+    if input_csv is not None:
         # ── 真实使用：从 CSV 读取 ──────────────────────────────
-        # CSV 至少需要两列：sample_id、class_name
-        # 例：
-        #   sample_id, class_name, video_path, label
-        #   0, pumping_fist, /data/v0.mp4, 0
-        #   1, petting_cat,  /data/v1.mp4, 1
-        samples = pd.read_csv(INPUT_CSV)
-        print(f"      共 {len(samples)} 个样本，来自 {INPUT_CSV}")
+        samples = pd.read_csv(input_csv)
+        print(f"      共 {len(samples)} 个样本，来自 {input_csv}")
     else:
         # ── 演示用：生成模拟数据 ───────────────────────────────
         np.random.seed(0)
@@ -237,12 +252,12 @@ if __name__ == "__main__":
         print(f"      使用模拟数据：{len(samples)} 个样本，{len(class_list)} 个类别")
 
     # ── 3. 分配噪声 ───────────────────────────────────────────
-    print(f"[3/4] 分配噪声（配额上限法，seed={SEED}）")
-    result = assign_noises(samples, compat_table, seed=SEED)
+    print(f"[3/4] 分配噪声（配额上限法，seed={seed}）")
+    result = assign_noises(samples, compat_table, seed=seed)
 
     # ── 4. 保存 + 报告 ────────────────────────────────────────
-    result.to_csv(OUTPUT_CSV, index=False)
-    print(f"[4/4] 结果已保存到 {OUTPUT_CSV}")
+    result.to_csv(output_csv, index=False)
+    print(f"[4/4] 结果已保存到 {output_csv}")
     print(f"\n前 10 条结果：")
     print(result[["sample_id", "class_name", "assigned_noise"]].head(10).to_string(index=False))
 

@@ -64,7 +64,7 @@ VIDEO_NOISES = [
 ]
 VA_NOISES_VIDEO = ["VA_gaussian", "VA_rain"]   # 联合噪声中也涉及视频
 
-NEED_VIDEO_CORRUPTION = set(VIDEO_NOISES + VA_NOISES_VIDEO)
+NEED_VIDEO_CORRUPTION = set(VIDEO_NOISES + VA_NOISES_VIDEO + ["Missing_video"])
 
 
 # ══════════════════════════════════════════════════════════════
@@ -257,7 +257,7 @@ FROST_FILES_RESOLVED = None   # 由 main 填充，需在模块顶层声明 globa
 
 def _frost(x, severity):
     c = [(1, 0.4), (0.8, 0.6), (0.7, 0.7), (0.65, 0.7), (0.6, 0.75)][severity - 1]
-    idx = np.random.randint(5)
+    idx = np.random.randint(6)
     # 优先使用 resolved 路径，否则 fallback 到本地相对路径
     if FROST_FILES_RESOLVED:
         frost_file = FROST_FILES_RESOLVED[idx]
@@ -269,6 +269,11 @@ def _frost(x, severity):
     ys = np.random.randint(0, frost.shape[1] - 224)
     frost = frost[xs:xs + 224, ys:ys + 224][..., [2, 1, 0]]
     return np.clip(c[0] * np.array(x) + c[1] * frost, 0, 255)
+
+
+def _missing_video(x, severity):
+    """生成全黑帧（224x224x3），用于 Missing_video 噪声类型"""
+    return np.zeros((224, 224, 3), dtype=np.uint8)
 
 
 def _snow(x, severity):
@@ -362,6 +367,12 @@ def _jpeg_compression(x, severity):
         return PILImage.open(buf)
 
 
+# VA 噪声 → 视频输出子目录名（需与 create_corrupted_json.py 中的 VA_NOISES 映射一致）
+VA_NOISES_VIDEO_CORRUPTION_DIR = {
+    "VA_gaussian": "gaussian_noise",
+    "VA_rain":     "snow",
+}
+
 # 噪声名称 → 函数映射
 NAME_TO_FUNC = {
     "V_gaussian_noise":    _gaussian_noise,
@@ -374,14 +385,14 @@ NAME_TO_FUNC = {
     "V_snow":             _snow,
     "V_frost":            _frost,
     "V_fog":              _fog,
-    "V_brightness":       _brightness,
+    "V_brightness":        _brightness,
     "V_contrast":         _contrast,
     "V_elastic_transform": _elastic_transform,
     "V_pixelate":         _pixelate,
     "V_jpeg_compression": _jpeg_compression,
-    # VA 联合噪声中的视频部分映射到同名函数
     "VA_gaussian":        _gaussian_noise,
-    "VA_rain":            _snow,   # 用雪天代替雨天的视觉效果
+    "VA_rain":            _snow,
+    "Missing_video":       _missing_video,
 }
 
 
@@ -473,9 +484,14 @@ class CorruptVideoDataset(data.Dataset):
             img_out = img_tensor
 
         # 保存
-        corruption_dir = noise.replace("V_", "").lower()
-        if noise.startswith("VA_"):
-            corruption_dir = noise.lower().replace("_", "_")
+        if noise.startswith("V_"):
+            corruption_dir = noise.replace("V_", "").lower()
+        elif noise.startswith("VA_"):
+            corruption_dir = VA_NOISES_VIDEO_CORRUPTION_DIR.get(noise, noise.lower().replace("_", "_"))
+        elif noise == "Missing_video":
+            corruption_dir = "missing_video"
+        else:
+            corruption_dir = noise.lower()
 
         save_dir = os.path.join(
             self.output_dir, corruption_dir,

@@ -1,6 +1,21 @@
 # corrupt-dataset
 
-音视频污染数据集生成流水线。给定 Kinetics-Sound 50 和 VGGSound 的原始视频帧 + 音频，自动生成 25 种噪声类型 × 5 级严重程度的污染版本，并输出 PyTorch 可直接加载的训练索引 JSON。
+音视频污染数据集生成流水线。给定 Kinetics-Sound 50 和 VGGSound 的原始视频帧 + 音频，自动生成 **25 种噪声类型 × 5 级严重程度**的污染数据，并输出 PyTorch 可直接加载的训练索引 JSON。
+
+---
+
+## 快速开始
+
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
+# 配置路径（复制示例配置文件并修改路径）
+cp USER_CONFIG.example.py USER_CONFIG.py
+
+# 一键运行完整流水线（severity=3, 4 workers）
+python run.py --dataset ks50 --from-step 0 --to-step 5 --severity 3 --workers 4
+```
 
 ---
 
@@ -15,33 +30,27 @@
 | **VGGSound** | `image_mulframe_test/frame_0~9/*.jpg` + `audio_test/*.wav` | VGGSound 官方 |
 | **环境音**（5 个 .wav） | `traffic.wav`, `crowd.wav`, `rain.wav`, `thunder.wav`, `wind.wav` | Audioset 或自采 |
 
----
-
-## 安装
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## 配置
-
-```bash
-cp USER_CONFIG.example.py USER_CONFIG.py
-# 修改 USER_CONFIG.py 中的路径为本地实际路径
-```
-
-`USER_CONFIG.py` 中的 `EXTERNAL_DATA` 字典填写各数据集的本地根目录路径。
+在 `USER_CONFIG.py` 的 `EXTERNAL_DATA` 字典中填写各数据集的本地根目录路径。
 
 ---
 
 ## 流水线用法
 
+### 支持的数据集
+
+| `--dataset` | 说明 |
+|---|---|
+| `ks50` | Kinetics-Sound 50 测试集（50 类） |
+| `ks50_train` | Kinetics-Sound 50 训练集（50 类） |
+| `vgg` | VGGSound 测试集（309 类） |
+
+### 严重程度
+
+`--severity 1~5`，数值越大污染越强。不同噪声类型在各级别有不同的参数（噪声强度、模糊半径、叠加音量等）。
+
 ### 完整流水线
 
 ```bash
-# 一次性运行 Step 0 → Step 5（severity=3, 4 workers）
 python run.py --dataset ks50 --from-step 0 --to-step 5 --severity 3 --workers 4
 ```
 
@@ -56,21 +65,9 @@ python run.py --dataset ks50 --step 4 --severity 3
 python run.py --dataset ks50 --step 5 --severity 3
 ```
 
-### 支持的数据集
-
-| `--dataset` | 说明 |
-|---|---|
-| `ks50` | Kinetics-Sound 50 测试集（50 类） |
-| `ks50_train` | Kinetics-Sound 50 训练集（50 类） |
-| `vgg` | VGGSound 测试集（309 类） |
-
-### 严重程度
-
-`--severity 1~5`，数值越大污染越强。不同噪声类型在各级别有不同的参数（噪声强度、模糊半径、叠加音量等）。
-
 ---
 
-## 流水线各步骤说明
+## 流水线各步骤
 
 | Step | 脚本 | 输入 | 输出 | 说明 |
 |------|------|------|------|------|
@@ -132,13 +129,39 @@ python run.py --dataset ks50 --step 5 --severity 3
 
 ---
 
+## 输出 JSON 格式
+
+`clean.json` 和 `corrupt.json` 结构相同，区别在于路径指向干净或污染后的文件：
+
+```json
+{
+  "dataset": "kinetics50",
+  "data": [
+    {
+      "video_id": "-LsQK3zOcwo",
+      "wav": "/path/to/-LsQK3zOcwo.wav",
+      "video_path": "/path/to/frame_0",
+      "frame_count": 10,
+      "corruption": "clean",
+      "severity": 3,
+      "labels": 0,
+      "class_name": "pumping_fist"
+    }
+  ]
+}
+```
+
+`corrupt.json` 中额外包含 `assigned_noise` 和 `noise_severity` 字段。
+
+---
+
 ## 目录结构
 
 ```
 corrupt-dataset/
 ├── config.py                        # 全局配置（路径管理）
 ├── run.py                           # 流水线主控脚本
-├── USER_CONFIG.example.py            # 用户配置示例
+├── USER_CONFIG.example.py           # 用户配置示例
 ├── requirements.txt
 ├── .gitignore
 │
@@ -178,29 +201,3 @@ corrupt-dataset/
     ├── clean/severity_N/severity_N.json
     └── corrupt/severity_N/severity_N.json
 ```
-
----
-
-## 输出 JSON 格式
-
-`clean.json` 和 `corrupt.json` 结构相同，区别在于路径指向干净或污染后的文件：
-
-```json
-{
-  "dataset": "kinetics50",
-  "data": [
-    {
-      "video_id": "-LsQK3zOcwo",
-      "wav": "/path/to/-LsQK3zOcwo.wav",
-      "video_path": "/path/to/frame_0",
-      "frame_count": 10,
-      "corruption": "clean",
-      "severity": 3,
-      "labels": 0,
-      "class_name": "pumping_fist"
-    }
-  ]
-}
-```
-
-`corrupt.json` 中额外包含 `assigned_noise` 和 `noise_severity` 字段。

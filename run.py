@@ -60,33 +60,13 @@ def step1(dataset_key):
     print(f"[Step 1] 为 {cfg['name']} 分配噪声...")
 
     script = os.path.join(config.BASE_DIR, "1_noise_assignment", "noise_assignment.py")
-    tmp_script = "/tmp/noise_assignment_run.py"
-
-    with open(script, "r") as f:
-        content = f.read()
-
-    # 改为绝对路径，避免相对路径问题
-    content = content.replace(
-        'XLSX_PATH   = "noise_compatibility_KS50_VGGSound.xlsx"',
-        f'XLSX_PATH   = "{config.NOISE_COMPAT}"'
-    )
-    content = content.replace(
-        'INPUT_CSV   = None',  # 你的样本 CSV 路径，None 则使用下方 mock 数据
-        f'INPUT_CSV   = "{cfg["sample_list"]}"'
-    )
-    content = content.replace(
-        f'OUTPUT_CSV  = "dataset_with_noise.csv"',
-        f'OUTPUT_CSV  = "{cfg["noise_csv"]}"'
-    )
-    content = content.replace(
-        f'SHEET_NAME  = "KS-50 (50 classes)"',
-        f'SHEET_NAME  = "{cfg["sheet_name"]}"'
-    )
-
-    with open(tmp_script, "w") as f:
-        f.write(content)
-
-    result = subprocess.run([sys.executable, tmp_script], check=True)
+    result = subprocess.run([
+        sys.executable, script,
+        "--xlsx-path",  config.NOISE_COMPAT,
+        "--input-csv",  cfg["sample_list"],
+        "--output-csv", cfg["noise_csv"],
+        "--sheet-name", cfg["sheet_name"],
+    ], check=True)
     print(f"[Step 1] 完成：{cfg['noise_csv']}")
 
 
@@ -241,7 +221,7 @@ def step5(dataset_key, severity):
         "--output-dir",           config.OUTPUT_DIR,
         "--severity",             str(severity),
     ], check=True)
-    print(f"[Step 5] 完成：{cfg['corrupt_json']}")
+    print(f"[Step 5] 完成：{os.path.join(config.OUTPUT_DIR, 'corrupt', f'severity_{severity}', f'severity_{severity}.json')}")
 
 
 def main():
