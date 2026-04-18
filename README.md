@@ -38,7 +38,7 @@ python run.py --dataset ks50 --from-step 0 --to-step 5 --severity 3 --workers 4
 
 ### 支持的数据集
 
-| `dataset` | 说明 |
+| `--dataset` | 说明 |
 |---|---|
 | `ks50` | Kinetics-Sound 50 测试集（50 类） |
 | `ks50_train` | Kinetics-Sound 50 训练集（50 类） |
@@ -46,7 +46,7 @@ python run.py --dataset ks50 --from-step 0 --to-step 5 --severity 3 --workers 4
 
 ### 严重程度
 
-`severity 1~5`，数值越大污染越强。不同噪声类型在各级别有不同的参数（噪声强度、模糊半径、叠加音量等）。
+`--severity 1~5`，所有样本共用同一个 severity 等级，数值越大污染越强。不同噪声类型在各级别有不同的参数（噪声强度、模糊半径、叠加音量等）。
 
 ### 完整流水线
 
@@ -73,8 +73,8 @@ python run.py --dataset ks50 --step 5 --severity 3
 |------|------|------|------|------|
 | **Step 0** | `0_convert/convert_refer_to_csv.py` | `data/refer/*.json` | `_sample_lists/*.csv` | 将样本索引转换为 CSV |
 | **Step 1** | `1_noise_assignment/noise_assignment.py` | `_sample_lists/*.csv` + Excel 兼容性表 | `_output/*_with_noise.csv` | 为每个样本分配一种兼容的噪声类型 |
-| **Step 2** | `2_corruption/make_c_video.py` | `_output/*_with_noise.csv` + 视频帧 | `_output/ks50_video_frames_C/` | 生成污染视频帧（15 种视频/VA 噪声） |
-| **Step 3** | `2_corruption/make_c_audio.py` | `_output/*_with_noise.csv` + 音频 + 环境音 | `_output/ks50_audio_C/` | 生成污染音频（6 种音频/VA 噪声 + 静音） |
+| **Step 2** | `2_corruption/make_c_video.py` | `_output/*_with_noise.csv` + 视频帧 | `_output/ks50_video_frames_C/` | 生成污染视频帧（18 种：15 种 V_ + 2 种 VA_ + Missing_video） |
+| **Step 3** | `2_corruption/make_c_audio.py` | `_output/*_with_noise.csv` + 音频 + 环境音 | `_output/ks50_audio_C/` | 生成污染音频（9 种：6 种 A_ + 2 种 VA_ + Missing_audio） |
 | **Step 4** | `run.py`（内置） | `_sample_lists/*.csv` + `data/class_labels/*.csv` | `_output/clean/severity_N/severity_N.json` | 生成 clean 数据索引（含数字 label） |
 | **Step 5** | `0_convert/create_corrupted_json.py` | Step 1-4 的输出 | `_output/corrupt/severity_N/severity_N.json` | 生成 corrupt 数据索引（替换文件路径为污染路径） |
 
@@ -151,7 +151,7 @@ python run.py --dataset ks50 --step 5 --severity 3
 }
 ```
 
-`corrupt.json` 中额外包含 `assigned_noise` 和 `noise_severity` 字段。
+`corrupt.json` 中额外包含 `corruption_dir` 字段，标识噪声对应的子目录名。
 
 ---
 
@@ -192,12 +192,19 @@ corrupt-dataset/
 │
 ├── _sample_lists/                   # Step 0 产出（可重新生成）
 │   ├── ks50_sample_list.csv
+│   ├── ks50_train_sample_list.csv
 │   └── vgg_sample_list.csv
 │
 └── _output/                        # Step 1-5 产出
     ├── ks50_with_noise.csv
+    ├── ks50_train_with_noise.csv
+    ├── vgg_with_noise.csv
     ├── ks50_audio_C/                # 污染音频
+    ├── ks50_train_audio_C/          # 污染音频
+    ├── vgg_audio_C/                 # 污染音频
     ├── ks50_video_frames_C/         # 污染视频帧
+    ├── ks50_train_video_frames_C/   # 污染视频帧
+    ├── vgg_video_frames_C/          # 污染视频帧
     ├── clean/severity_N/severity_N.json
     └── corrupt/severity_N/severity_N.json
 ```
