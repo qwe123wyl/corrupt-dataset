@@ -51,6 +51,7 @@ VIDEO_NOISES = {
     "V_glass_blur":        "glass_blur",
     "V_motion_blur":       "motion_blur",
     "V_zoom_blur":         "zoom_blur",
+    "V_rain":              "rain",
     "V_snow":              "snow",
     "V_frost":             "frost",
     "V_fog":               "fog",

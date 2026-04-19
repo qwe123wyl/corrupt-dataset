@@ -58,7 +58,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 VIDEO_NOISES = [
     "V_gaussian_noise", "V_shot_noise", "V_impulse_noise",
     "V_defocus_blur", "V_glass_blur", "V_motion_blur", "V_zoom_blur",
-    "V_snow", "V_frost", "V_fog",
+    "V_rain", "V_snow", "V_frost", "V_fog",
     "V_brightness", "V_contrast", "V_elastic_transform",
     "V_pixelate", "V_jpeg_compression",
 ]
@@ -367,10 +367,39 @@ def _jpeg_compression(x, severity):
         return PILImage.open(buf)
 
 
+def _rain(img, severity):
+    """Adds rain. Adapted from MiOIR."""
+    img = np.array(img)
+    img = img.copy()
+    w = 3
+    length = np.random.randint(20, 40)
+    angle = np.random.randint(-30, 30)
+    value = np.random.randint(50, 100)
+    noise = np.random.uniform(0, 256, img.shape[0:2])
+    v = value * 0.01
+    noise[np.where(noise < (256 - v))] = 0
+    k = np.array([[0, 0.1, 0],
+                  [0.1, 8, 0.1],
+                  [0, 0.1, 0]])
+    noise = cv2.filter2D(noise, -1, k)
+    trans = cv2.getRotationMatrix2D((length / 2, length / 2), angle - 45, 1 - length / 100.0)
+    dig = np.diag(np.ones(length))
+    k = cv2.warpAffine(dig, trans, (length, length))
+    k = cv2.GaussianBlur(k, (w, w), 0)
+    blurred = cv2.filter2D(noise, -1, k)
+    cv2.normalize(blurred, blurred, 0, 255, cv2.NORM_MINMAX)
+    blurred = np.array(blurred, dtype=np.uint8)
+    rain = np.expand_dims(blurred, 2)
+    rain = np.repeat(rain, 3, 2)
+    img = img.astype('float32') + rain
+    np.clip(img, 0, 255, out=img)
+    return img.round().astype(np.uint8)
+
+
 # VA 噪声 → 视频输出子目录名（需与 create_corrupted_json.py 中的 VA_NOISES 映射一致）
 VA_NOISES_VIDEO_CORRUPTION_DIR = {
     "VA_gaussian": "gaussian_noise",
-    "VA_rain":     "snow",
+    "VA_rain":     "rain",
 }
 
 # 噪声名称 → 函数映射
@@ -382,6 +411,7 @@ NAME_TO_FUNC = {
     "V_glass_blur":       _glass_blur,
     "V_motion_blur":      _motion_blur,
     "V_zoom_blur":        _zoom_blur,
+    "V_rain":             _rain,
     "V_snow":             _snow,
     "V_frost":            _frost,
     "V_fog":              _fog,
@@ -391,7 +421,7 @@ NAME_TO_FUNC = {
     "V_pixelate":         _pixelate,
     "V_jpeg_compression": _jpeg_compression,
     "VA_gaussian":        _gaussian_noise,
-    "VA_rain":            _snow,
+    "VA_rain":            _rain,
     "Missing_video":       _missing_video,
 }
 

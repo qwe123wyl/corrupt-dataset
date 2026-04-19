@@ -45,12 +45,15 @@ def step0(dataset_key):
         sys.exit(1)
 
     print(f"[Step 0] 将 refer.json 转换为 CSV：{cfg['name']}")
-    result = subprocess.run([
+    cmd = [
         sys.executable,
         os.path.join(config.BASE_DIR, "0_convert", "convert_refer_to_csv.py"),
         "--json-path",   cfg["refer_json"],
         "--output-csv",  cfg["sample_list"],
-    ], check=True)
+    ]
+    if "class_csv" in cfg and cfg["class_csv"]:
+        cmd += ["--class-csv", cfg["class_csv"]]
+    result = subprocess.run(cmd, check=True)
     print(f"[Step 0] 完成：{cfg['sample_list']}")
 
 

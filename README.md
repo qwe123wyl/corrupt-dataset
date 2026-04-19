@@ -1,6 +1,6 @@
 # corrupt-dataset
 
-音视频视听联合鲁棒性数据集生成流水线。给定 Kinetics-Sound 50 和 VGGSound 的原始视频帧 + 音频，遍历每个样本，根据类别兼容性表为其分配一种噪声，使用配额上限法保证 25 种噪声（× 5 级严重程度）均匀覆盖全量样本，最终输出污染后的视频帧、音频文件及 PyTorch 可直接加载的训练索引 JSON。
+音视频视听联合鲁棒性数据集生成流水线。给定 Kinetics-Sound 50 和 VGGSound 的原始视频帧 + 音频，遍历每个样本，根据类别兼容性表为其分配一种噪声，使用配额上限法保证 26 种噪声（× 5 级严重程度）均匀覆盖全量样本，最终输出污染后的视频帧、音频文件及 PyTorch 可直接加载的训练索引 JSON。
 
 ---
 
@@ -73,14 +73,14 @@ python run.py --dataset ks50 --step 5 --severity 3
 |------|------|------|------|------|
 | **Step 0** | `0_convert/convert_refer_to_csv.py` | `data/refer/*.json` | `_sample_lists/*.csv` | 将样本索引转换为 CSV |
 | **Step 1** | `1_noise_assignment/noise_assignment.py` | `_sample_lists/*.csv` + Excel 兼容性表 | `_output/*_with_noise.csv` | 为每个样本分配一种兼容的噪声类型 |
-| **Step 2** | `2_corruption/make_c_video.py` | `_output/*_with_noise.csv` + 视频帧 | `_output/ks50_video_frames_C/` | 生成污染视频帧（18 种：15 种 V_ + 2 种 VA_ + Missing_video） |
+| **Step 2** | `2_corruption/make_c_video.py` | `_output/*_with_noise.csv` + 视频帧 | `_output/ks50_video_frames_C/` | 生成污染视频帧（19 种：16 种 V_ + 2 种 VA_ + Missing_video） |
 | **Step 3** | `2_corruption/make_c_audio.py` | `_output/*_with_noise.csv` + 音频 + 环境音 | `_output/ks50_audio_C/` | 生成污染音频（9 种：6 种 A_ + 2 种 VA_ + Missing_audio） |
 | **Step 4** | `run.py`（内置） | `_sample_lists/*.csv` + `data/class_labels/*.csv` | `_output/clean/severity_N/severity_N.json` | 生成 clean 数据索引（含数字 label） |
 | **Step 5** | `0_convert/create_corrupted_json.py` | Step 1-4 的输出 | `_output/corrupt/severity_N/severity_N.json` | 生成 corrupt 数据索引（替换文件路径为污染路径） |
 
 ---
 
-## 25 种噪声类型
+## 26 种噪声类型
 
 ### 纯视频噪声（V_）
 
@@ -93,6 +93,7 @@ python run.py --dataset ks50 --step 5 --severity 3
 | `V_glass_blur` | 玻璃模糊 |
 | `V_motion_blur` | 运动模糊 |
 | `V_zoom_blur` | 缩放模糊 |
+| `V_rain` | 下雨（叠加雨条纹噪声） |
 | `V_snow` | 雪花遮挡 |
 | `V_frost` | 霜冻遮挡（使用 `2_corruption/make_corruptions/frost*.png/.jpg` 素材） |
 | `V_fog` | 雾气 |
@@ -118,7 +119,7 @@ python run.py --dataset ks50 --step 5 --severity 3
 | 噪声 | 说明 |
 |------|------|
 | `VA_gaussian` | 视频 + 音频同时加高斯噪声 |
-| `VA_rain` | 视频雪花 + 音频混入雨声 |
+| `VA_rain` | 视频下雨 + 音频混入雨声 |
 
 ### 缺失模态（Missing_）
 
