@@ -50,14 +50,13 @@ NEED_AUDIO_CORRUPTION = {
 MISSING_AUDIO = {"Missing_audio"}
 
 # 噪声 → 天气音频文件名（不含后缀），需与 weather/ 目录中的文件名一致
-# 注意：VA_gaussian 不在这里！它走纯高斯噪声路线（_corrupt_gaussian）
+# 注意：VA_gaussian 和 VA_rain 不在这里！它们各自有独立目录（va_gaussian/、va_rain/）
 NOISE_TO_WEATHER = {
     "A_traffic":   "traffic",
     "A_crowd":     "crowd",
     "A_rain":      "rain",
     "A_thunder":   "thunder",
     "A_wind":      "wind",
-    "VA_rain":     "rain",
 }
 
 # 高斯噪声标准差（severity 1-5）
@@ -86,11 +85,14 @@ def apply_audio_corruption(audio_file: str, noise: str,
 
     if noise == "A_gaussian_noise" or noise == "VA_gaussian":
         _corrupt_gaussian(audio_file, severity, output_file)
+    elif noise == "VA_rain":
+        weather_file = os.path.join(weather_dir, "rain.wav")
+        _corrupt_mix(audio_file, weather_file, severity, output_file, is_rain=True)
     elif noise in NOISE_TO_WEATHER:
         weather_file = os.path.join(
             weather_dir, NOISE_TO_WEATHER[noise] + ".wav")
         _corrupt_mix(audio_file, weather_file, severity, output_file,
-                     is_rain=(noise == "VA_rain"))
+                     is_rain=(noise == "A_rain"))
     elif noise == "Missing_audio":
         _corrupt_missing(audio_file, output_file)
     else:
@@ -186,12 +188,16 @@ class CorruptAudioDataset(data.Dataset):
         audio_file = os.path.join(self.audio_dir, vid + self.audio_suffix)
 
         # 输出路径
-        if noise in NOISE_TO_WEATHER:
+        if noise == "VA_gaussian":
+            subdir = "va_gaussian"
+        elif noise == "VA_rain":
+            subdir = "va_rain"
+        elif noise in NOISE_TO_WEATHER:
             subdir = NOISE_TO_WEATHER[noise]
         elif noise == "Missing_audio":
             subdir = "missing_audio"
         else:
-            subdir = noise.replace("A_", "").lower().replace("_", "_")
+            subdir = noise.replace("A_", "").lower()
 
         output_file = os.path.join(
             self.output_dir, subdir,

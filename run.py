@@ -10,6 +10,8 @@ corrupt-dataset 运行主控脚本
   Step 4 - 生成 clean 数据索引 JSON（训练用）
   Step 5 - 生成 corrupt 数据索引 JSON（训练用）
 
+每次运行会自动生成带时间戳的输出目录：_output/<dataset>_<timestamp>/
+
 示例：
   # 只跑 KS50：
   python run.py --dataset ks50 --step 0
@@ -24,16 +26,25 @@ corrupt-dataset 运行主控脚本
 """
 
 import os
-import re
 import sys
 import subprocess
 import argparse
-import config   # 统一路径管理
+import config
+from datetime import datetime
+
+
+def _init_timestamp(dataset_key):
+    """生成并设置时间戳目录名称，打印信息。"""
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts_name = f"{dataset_key}_{ts}"
+    config.set_timestamp(ts_name)
+    print(f"时间戳目录：{config.get_output_dir()}")
+    print()
 
 
 def step0(dataset_key):
     """Step 0: refer.json → sample_list.csv"""
-    cfg = config.DATASETS[dataset_key]
+    cfg = config.get_dataset_config(dataset_key)
     os.makedirs(config.SAMPLE_LISTS_DIR, exist_ok=True)
 
     if os.path.exists(cfg["sample_list"]):
@@ -59,8 +70,10 @@ def step0(dataset_key):
 
 def step1(dataset_key):
     """Step 1: 分配噪声"""
-    cfg = config.DATASETS[dataset_key]
+    cfg = config.get_dataset_config(dataset_key)
     print(f"[Step 1] 为 {cfg['name']} 分配噪声...")
+
+    os.makedirs(os.path.dirname(cfg["noise_csv"]), exist_ok=True)
 
     script = os.path.join(config.BASE_DIR, "1_noise_assignment", "noise_assignment.py")
     result = subprocess.run([
@@ -75,7 +88,7 @@ def step1(dataset_key):
 
 def step2(dataset_key, severity, workers):
     """Step 2: 生成污染视频帧"""
-    cfg = config.DATASETS[dataset_key]
+    cfg = config.get_dataset_config(dataset_key)
     print(f"[Step 2] 为 {cfg['name']} 生成污染视频帧...")
 
     script = os.path.join(config.BASE_DIR, "2_corruption", "make_c_video.py")
@@ -93,7 +106,7 @@ def step2(dataset_key, severity, workers):
 
 def step3(dataset_key, severity, workers):
     """Step 3: 生成污染音频"""
-    cfg = config.DATASETS[dataset_key]
+    cfg = config.get_dataset_config(dataset_key)
     print(f"[Step 3] 为 {cfg['name']} 生成污染音频...")
 
     script = os.path.join(config.BASE_DIR, "2_corruption", "make_c_audio.py")
@@ -120,7 +133,7 @@ _DATASET_ALIAS = {
 
 def step4(dataset_key, severity):
     """Step 4: 生成 clean 数据索引 JSON（训练用，含数字 labels）"""
-    cfg = config.DATASETS[dataset_key]
+    cfg = config.get_dataset_config(dataset_key)
     dataset_alias = _DATASET_ALIAS[dataset_key]
     print(f"[Step 4] 为 {cfg['name']} 生成 clean JSON...")
 
@@ -131,7 +144,6 @@ def step4(dataset_key, severity):
     class_csv = cfg["class_csv"]
     if not os.path.exists(class_csv):
         print(f"[警告] class label 文件不存在，跳过 labels 注入：{class_csv}")
-        # fallback：直接调用 create_clean_json.py
         script = os.path.join(config.BASE_DIR, "0_convert", "create_clean_json.py")
         subprocess.run([
             sys.executable, script,
@@ -139,13 +151,12 @@ def step4(dataset_key, severity):
             "--video-id-file",   cfg["sample_list"],
             "--audio-dir",       cfg["audio_dir"],
             "--video-frame-dir", cfg["video_dir"],
-            "--output-dir",      config.OUTPUT_DIR,
+            "--output-dir",      config.get_output_dir(),
             "--severity",        str(severity),
         ], check=True)
         return
 
     class_df = pd.read_csv(class_csv)
-    # 支持多种列名
     idx_col = next((c for c in class_df.columns if c.lower() in ("index", "id", "idx")), class_df.columns[0])
     name_col = next((c for c in class_df.columns if c.lower() in ("mid", "name", "label", "class_name")), None)
     if name_col is None:
@@ -190,7 +201,8 @@ def step4(dataset_key, severity):
             "class_name":   class_name,
         })
 
-    out_dir = os.path.join(config.OUTPUT_DIR, "clean", f"severity_{severity}")
+    # clean JSON 输出到 <output_dir>/clean/severity_N/severity_N.json
+    out_dir = os.path.join(cfg["clean_json"], f"severity_{severity}")
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, f"severity_{severity}.json")
     with open(out_path, "w", encoding="utf-8") as f:
@@ -201,13 +213,13 @@ def step4(dataset_key, severity):
 
 def step5(dataset_key, severity):
     """Step 5: 生成 corrupt 数据索引 JSON（训练用）"""
-    cfg = config.DATASETS[dataset_key]
+    cfg = config.get_dataset_config(dataset_key)
     dataset_alias = _DATASET_ALIAS[dataset_key]
     print(f"[Step 5] 为 {cfg['name']} 生成 corrupt JSON...")
 
-    # clean_json 输出路径来自 create_clean_json.py，固定为 _output/clean/severity_N/severity_N.json
+    # clean_json 输出路径：<output_dir>/clean/severity_N/severity_N.json
     clean_json = os.path.join(
-        config.OUTPUT_DIR, "clean", f"severity_{severity}", f"severity_{severity}.json")
+        cfg["clean_json"], f"severity_{severity}", f"severity_{severity}.json")
 
     if not os.path.exists(clean_json):
         print(f"[错误] clean JSON 不存在，请先运行 Step 4：{clean_json}")
@@ -221,16 +233,16 @@ def step5(dataset_key, severity):
         "--clean-json",           clean_json,
         "--audio-c-dir",          cfg["audio_out"],
         "--video-c-dir",          cfg["video_out"],
-        "--output-dir",           config.OUTPUT_DIR,
+        "--output-dir",           config.get_output_dir(),
         "--severity",             str(severity),
     ], check=True)
-    print(f"[Step 5] 完成：{os.path.join(config.OUTPUT_DIR, 'corrupt', f'severity_{severity}', f'severity_{severity}.json')}")
+    print(f"[Step 5] 完成：{os.path.join(config.get_output_dir(), 'corrupt', f'severity_{severity}', f'severity_{severity}.json')}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="corrupt-dataset 污染数据生成流水线")
     parser.add_argument("--dataset", type=str, default="ks50",
-                        choices=list(config.DATASETS.keys()),
+                        choices=["ks50", "ks50_train", "vgg"],
                         help="选择数据集")
     parser.add_argument("--step", type=int, choices=[0, 1, 2, 3, 4, 5],
                         help="只运行指定 step")
@@ -244,10 +256,14 @@ def main():
                         help="并行 worker 数")
     args = parser.parse_args()
 
+    # ── 初始化时间戳 ────────────────────────────────────────
+    _init_timestamp(args.dataset)
+
     print("=" * 60)
-    print(f"数据集：{config.DATASETS[args.dataset]['name']}")
+    print(f"数据集：{config.get_dataset_config(args.dataset)['name']}")
     print(f"严重程度：{args.severity}")
     print(f"Workers：{args.workers}")
+    print(f"输出目录：{config.get_output_dir()}")
     print("=" * 60)
 
     steps = range(args.from_step, args.to_step + 1)
@@ -270,6 +286,7 @@ def main():
 
     print("=" * 60)
     print("全部完成！")
+    print(f"输出目录：{config.get_output_dir()}")
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ SEED        = 42            # 随机种子，保证结果可复现
 
 ALL_NOISES = [
     "V_gaussian_noise", "V_shot_noise", "V_impulse_noise", "V_defocus_blur",
-    "V_glass_blur", "V_motion_blur", "V_zoom_blur", "V_rain", "V_snow", "V_frost", "V_fog",
+    "V_glass_blur", "V_motion_blur", "V_zoom_blur", "V_snow", "V_frost", "V_fog",
     "V_brightness", "V_contrast", "V_elastic_transform", "V_pixelate", "V_jpeg_compression",
     "A_gaussian_noise", "A_traffic", "A_crowd", "A_rain", "A_thunder", "A_wind",
     "VA_gaussian", "VA_rain",

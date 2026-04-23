@@ -193,44 +193,28 @@ def _glass_blur(x, severity):
     return np.clip(gaussian(x / 255., sigma=c[0], channel_axis=-1), 0, 1) * 255
 
 
-def _motion_blur(x, severity):
-    """
-    方向性运动模糊，用 OpenCV 实现（替代 ImageMagick 的 motion_blur）。
-    angle: 模糊方向（0-360°），random uniform [-45, 45]。
-    """
+def _motion_blur(x, severity=1):
     c = [(10, 3), (15, 5), (15, 8), (15, 12), (20, 15)][severity - 1]
     radius, sigma = c[0], c[1]
-    angle = np.random.uniform(-45, 45) * np.pi / 180  # 转为弧度
 
-    # 构建指定角度的线型 kernel
-    size = int(radius)
-    ksize = max(size * 2 + 1, 5)
-    # 方向单位向量
-    dx = np.cos(angle)
-    dy = np.sin(angle)
-    center = ksize // 2
-    kernel = np.zeros((ksize, ksize), dtype=np.float32)
-    for i in range(ksize):
-        for j in range(ksize):
-            px, py = j - center, i - center
-            dist = abs(dx * py - dy * px)  # 到直线的距离
-            along = dx * px + dy * py        # 沿直线方向
-            if dist <= sigma and abs(along) <= radius:
-                kernel[i, j] = 1.0
-    if kernel.sum() > 0:
-        kernel /= kernel.sum()
-    else:
-        kernel = cv2.getGaussianKernel(ksize, sigma)
-        kernel = kernel @ kernel.T
+    x = np.array(x)
 
-    x_np = np.array(x)
-    if x_np.ndim == 2:
-        blurred = cv2.filter2D(x_np.astype(np.float32) / 255., -1, kernel) * 255
-        return np.clip(blurred, 0, 255)
-    else:
-        channels = [cv2.filter2D(x_np[:, :, d].astype(np.float32) / 255., -1, kernel) * 255
-                    for d in range(x_np.shape[2])]
-        return np.clip(np.stack(channels, axis=-1), 0, 255)
+    angle = np.random.uniform(-45, 45)
+    kernel_size = radius * 2 + 1
+    kernel = np.zeros((kernel_size, kernel_size))
+    for i in range(kernel_size):
+        kernel[radius, i] = np.exp(-0.5 * ((i - radius) / sigma) ** 2)
+    kernel = kernel / kernel.sum()
+    M = cv2.getRotationMatrix2D((radius, radius), angle, 1.0)
+    kernel = cv2.warpAffine(kernel, M, (kernel_size, kernel_size))
+    kernel = kernel / kernel.sum()
+
+    x = cv2.filter2D(x, -1, kernel)
+
+    if x.ndim == 2:
+        x = np.stack([x, x, x], axis=-1)
+
+    return np.clip(x, 0, 255).astype(np.uint8)
 
 
 def _zoom_blur(x, severity):
@@ -276,23 +260,33 @@ def _missing_video(x, severity):
     return np.zeros((224, 224, 3), dtype=np.uint8)
 
 
-def _snow(x, severity):
-    c = [(0.1, 0.3, 3, 0.5, 10, 4, 0.8), (0.2, 0.3, 2, 0.5, 12, 4, 0.7),
-         (0.55, 0.3, 4, 0.9, 12, 8, 0.7), (0.55, 0.3, 4.5, 0.85, 12, 8, 0.65),
+def _snow(x, severity=1):
+    c = [(0.1, 0.3, 3, 0.5, 10, 4, 0.8),
+         (0.2, 0.3, 2, 0.5, 12, 4, 0.7),
+         (0.55, 0.3, 4, 0.9, 12, 8, 0.7),
+         (0.55, 0.3, 4.5, 0.85, 12, 8, 0.65),
          (0.55, 0.3, 2.5, 0.85, 12, 12, 0.55)][severity - 1]
+
     x = np.array(x, dtype=np.float32) / 255.
     snow_layer = np.random.normal(size=x.shape[:2], loc=c[0], scale=c[1])
+
     snow_layer = clipped_zoom(snow_layer[..., np.newaxis], c[2])
     snow_layer[snow_layer < c[3]] = 0
-    # 用 OpenCV 的 GaussianBlur 替代 ImageMagick motion_blur（效果近似）
-    snow_layer = PILImage.fromarray(
-        (np.clip(snow_layer.squeeze(), 0, 1) * 255).astype(np.uint8), mode='L')
-    snow_layer = np.array(snow_layer, dtype=np.float32) / 255.
-    snow_layer = cv2.GaussianBlur(snow_layer, ksize=(c[4] * 2 // 2 * 2 + 1, c[4] * 2 // 2 * 2 + 1),
-                                  sigmaX=c[5])
+
+    snow_layer = np.clip(snow_layer.squeeze(), 0, 1).astype(np.float32)
+    radius, sigma = int(c[4]), c[5]
+    kernel_size = radius * 2 + 1
+    kernel = np.zeros((kernel_size, kernel_size))
+    for i in range(kernel_size):
+        kernel[radius, i] = np.exp(-0.5 * ((i - radius) / sigma) ** 2)
+    kernel = kernel / kernel.sum()
+    M = cv2.getRotationMatrix2D((radius, radius), np.random.uniform(-135, -45), 1.0)
+    kernel = cv2.warpAffine(kernel, M, (kernel_size, kernel_size))
+    kernel = kernel / kernel.sum()
+    snow_layer = cv2.filter2D(snow_layer, -1, kernel)
     snow_layer = snow_layer[..., np.newaxis]
-    x = c[6] * x + (1 - c[6]) * np.maximum(
-        x, cv2.cvtColor(x, cv2.COLOR_RGB2GRAY).reshape(224, 224, 1) * 1.5 + 0.5)
+
+    x = c[6] * x + (1 - c[6]) * np.maximum(x, cv2.cvtColor(x, cv2.COLOR_RGB2GRAY).reshape(224, 224, 1) * 1.5 + 0.5)
     return np.clip(x + snow_layer + np.rot90(snow_layer, k=2), 0, 1) * 255
 
 
@@ -396,10 +390,10 @@ def _rain(img, severity):
     return img.round().astype(np.uint8)
 
 
-# VA 噪声 → 视频输出子目录名（需与 create_corrupted_json.py 中的 VA_NOISES 映射一致）
+# VA 噪声 → 视频输出子目录名（独立目录，与纯视频噪声 V_gaussian/V_rain 分离）
 VA_NOISES_VIDEO_CORRUPTION_DIR = {
-    "VA_gaussian": "gaussian_noise",
-    "VA_rain":     "rain",
+    "VA_gaussian": "va_gaussian",
+    "VA_rain":     "va_rain",
 }
 
 # 噪声名称 → 函数映射

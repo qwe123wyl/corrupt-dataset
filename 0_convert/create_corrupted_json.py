@@ -72,10 +72,10 @@ AUDIO_NOISES = {
     "A_wind":            "wind",
 }
 
-# 视听联合噪声（同时需要视频和音频）
+# 视听联合噪声（同时需要视频和音频），与纯视频/音频噪声使用独立目录
 VA_NOISES = {
-    "VA_gaussian": "gaussian",
-    "VA_rain":     "snow",
+    "VA_gaussian": "va_gaussian",
+    "VA_rain":     "va_rain",
 }
 
 # 缺失模态噪声（路径指向 clean 数据，但标记为缺失）
@@ -193,16 +193,8 @@ def build_corrupted_json(dataset: str,
 
         elif noise_type == "va":
             corruption_dir_name = VA_NOISES[noise]
-            # 视听联合噪声
-            if "gaussian" in noise.lower():
-                video_corruption = "gaussian_noise"
-            elif "rain" in noise.lower():
-                video_corruption = "snow"
-            else:
-                video_corruption = noise
-
             video_path = os.path.join(
-                video_c_dir, video_corruption,
+                video_c_dir, corruption_dir_name,
                 f"severity_{severity}", "frame_0"
             )
             wav_path = os.path.join(
